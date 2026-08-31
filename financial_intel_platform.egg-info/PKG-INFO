@@ -1,0 +1,177 @@
+Metadata-Version: 2.4
+Name: financial-intel-platform
+Version: 1.0.0
+Summary: Production-grade multi-agent financial intelligence and reporting platform
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.111.0
+Requires-Dist: uvicorn[standard]>=0.30.0
+Requires-Dist: pydantic>=2.7.0
+Requires-Dist: pydantic-settings>=2.2.0
+Requires-Dist: sqlalchemy[asyncio]>=2.0.30
+Requires-Dist: asyncpg>=0.29.0
+Requires-Dist: redis[hiredis]>=5.0.4
+Requires-Dist: langgraph>=0.0.60
+Requires-Dist: langchain>=0.2.0
+Requires-Dist: langchain-core>=0.2.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: tenacity>=8.3.0
+Requires-Dist: yfinance>=0.2.40
+Requires-Dist: numpy>=1.26.0
+Requires-Dist: pandas>=2.2.0
+Requires-Dist: alembic>=1.13.0
+Requires-Dist: python-dotenv>=1.0.1
+Provides-Extra: dev
+Requires-Dist: pytest>=8.2.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0.0; extra == "dev"
+Requires-Dist: ruff>=0.4.0; extra == "dev"
+Requires-Dist: mypy>=1.10.0; extra == "dev"
+
+# Financial Intelligence Platform — Master Plan
+
+**Status:** Planning
+**Owner:** you
+**Purpose of this document:** entry point and index for all other planning docs in this folder. Read this first, then work through the phase files in order.
+
+---
+
+## 1. What this project is
+
+A production-grade system that generates explainable, multi-source investment analysis reports for publicly traded companies (financial statements, market data, sector trends, news, social sentiment, historical performance → forecast + report).
+
+**The forecast accuracy is not the point.** The point is demonstrating, at a level that reads as "internal platform at a quant/investment intelligence team," not "cool agent demo":
+
+- Backend engineering (typed contracts, service boundaries, data layer design)
+- Distributed-systems thinking (async orchestration, retries, idempotency, backpressure)
+- AI engineering (agent orchestration, evaluation, explainability)
+- Production deployment (containerized, CI/CD, cloud-deployed)
+- Observability (traces, metrics, logs tied to business outcomes)
+- Testing discipline (unit → contract → integration → e2e → load → chaos)
+- Documented tradeoffs (ADRs for every non-trivial decision)
+
+If a FAANG or hedge-fund interviewer opens the repo, the `docs/adr/` folder and the test suite should do as much talking as the code.
+
+---
+
+## 2. Non-negotiable principles (apply to every phase)
+
+1. **Clear ownership boundaries.** No agent, module, or service does more than one job. If you can't describe a component's job in one sentence, split it.
+2. **Typed contracts only.** Agents never pass natural language or untyped dicts to each other. Every agent has a versioned Pydantic input schema and output schema. This is true even inside the Phase 1 monolith — typed contracts are a design discipline, not a microservices feature.
+3. **All external data is untrusted.** Every external call (market data API, news API, social API) gets validation, timeout, retry with backoff, circuit breaking, and a documented fallback/degradation path.
+4. **Every result is traceable.** A report must be able to answer, after the fact: which data sources fed it, which agents ran, what assumptions were made, what the confidence score was and why.
+
+---
+
+## 3. Phase roadmap
+
+Build in this order. Do not start a phase until the previous one has a working, tested increment. Each phase has its own detailed `.md` file in this folder.
+
+| Phase | File | Goal | Rough duration |
+|---|---|---|---|
+| 1 | `01_phase1_monolith_foundation.md` | Single-process monolith: all 8 agents, one FastAPI service, one Postgres, one Redis, synchronous orchestration | 2–4 weeks |
+| 2 | `02_phase2_observability_testing_eval.md` | Add OpenTelemetry/LangSmith tracing, Prometheus/Grafana, full test pyramid, offline evaluation framework | 1–2 weeks |
+| 3 | `03_phase3_frontend.md` | Next.js frontend: search, config, live job status, report viewer, agent trace viewer | 2–3 weeks |
+| 4 | `04_phase4_async_job_queue.md` | Move orchestration off the request thread into Celery (or Temporal) | 1 week |
+| 5 | `05_phase5_service_decomposition.md` | Split services only where justified; deploy to AWS | 1–2 weeks |
+
+Supporting reference docs (not phase-gated, used throughout):
+
+- `06_data_contracts_schemas.md` — every Pydantic schema in the system, written once and imported everywhere
+- `07_adr_process_and_templates.md` — ADR template + the first ~10 ADRs you should write
+
+**Why monolith-first:** distributed systems built as microservices from day one almost always produce worse designs than ones that started as a well-factored monolith and split along real seams later. Building Phase 1 as a monolith with strict internal module boundaries (agents as packages, not services) means Phase 5's "split into services" decision is informed by actual pain points (which module is the bottleneck, which module has different scaling needs) rather than guesswork. This is itself worth an ADR.
+
+---
+
+## 4. Target user journey (for grounding every design decision)
+
+1. User enters ticker `AAPL`, selects analysis type `Quarterly Outlook`.
+2. System kicks off:
+   - Market data collection
+   - Financial statement collection
+   - News collection
+   - Social sentiment collection
+   - Sector analysis
+   - Competitor analysis
+   - Signal generation
+   - Forecast generation
+   - Risk analysis
+   - Report generation
+3. User receives: executive summary, bull case, bear case, predicted direction, volatility estimate, confidence score, supporting evidence, interactive charts, and an **agent trace** showing what ran and why.
+
+Every phase should be evaluated against: "does this get us closer to serving that journey reliably, observably, and explainably?"
+
+---
+
+## 5. Tech stack (final)
+
+| Layer | Technology | Notes |
+|---|---|---|
+| Frontend | Next.js, React, TypeScript, Tailwind, shadcn/ui | Phase 3 |
+| API Gateway | FastAPI | Auth, validation, rate limiting, job submission |
+| Orchestrator | LangGraph (state machine fallback if it fights you) | Parallel fan-out/fan-in DAG |
+| Data layer | Postgres, Redis, S3-compatible object storage | Postgres = system of record, Redis = cache, S3 = report artifacts/raw payloads |
+| Async jobs (Phase 4) | Celery + Redis broker (Temporal as documented alternative) | |
+| Observability | OpenTelemetry, LangSmith, Prometheus, Grafana | |
+| Testing | pytest, httpx, Locust/k6, custom chaos harness | |
+| CI/CD | GitHub Actions | lint → typecheck → unit → integration → docker build → security scan → deploy |
+| Containerization | Docker, docker-compose (local), ECS Fargate or EKS (prod) | |
+| Cloud | AWS: ECS, RDS, ElastiCache, S3, CloudWatch | Kubernetes documented as alternative if the learning goal includes k8s |
+| Auth | JWT + RBAC | |
+| Secrets | AWS Secrets Manager | |
+
+---
+
+## 6. Repository structure (used consistently across all phase docs)
+
+```
+financial-intel-platform/
+├── apps/
+│   ├── api/                    # FastAPI gateway + orchestrator entrypoint
+│   └── web/                    # Next.js frontend (Phase 3)
+├── packages/
+│   ├── contracts/              # Shared, versioned Pydantic schemas
+│   ├── agents/
+│   │   ├── market_data/
+│   │   ├── financials/
+│   │   ├── news/
+│   │   ├── sentiment/
+│   │   ├── sector/
+│   │   ├── risk/
+│   │   ├── forecast/
+│   │   └── report/
+│   ├── orchestrator/           # LangGraph graph definitions, nodes, edges
+│   └── infra/                  # DB models/migrations, cache client, external API clients, resilience utils
+├── docs/
+│   ├── adr/                    # One markdown file per decision
+│   ├── architecture.md
+│   ├── runbook.md
+│   ├── incident-response.md
+│   ├── testing-strategy.md
+│   ├── monitoring-guide.md
+│   └── onboarding.md
+├── tests/
+│   ├── unit/
+│   ├── contract/
+│   ├── integration/
+│   ├── e2e/
+│   ├── load/
+│   └── chaos/
+├── docker/
+│   ├── docker-compose.yml
+│   └── Dockerfile.api
+├── .github/workflows/
+│   └── ci.yml
+└── pyproject.toml
+```
+
+This structure stays the same from Phase 1 through Phase 4. Phase 5 is the only phase that reorganizes it (into per-service repos or a monorepo with per-service deploy configs) — and only if the evidence from Phase 2's metrics justifies it.
+
+---
+
+## 7. Deliverable standard
+
+By the end, the repo should read like an internal platform built by a quant research / investment intelligence engineering team, and should be defensible in an interview as: "here's the problem, here are the alternatives I considered, here's why I chose this, here's what it costs me, here's how I'd operate it at 3am when it breaks."
+
+Next: open `01_phase1_monolith_foundation.md` and start there.
