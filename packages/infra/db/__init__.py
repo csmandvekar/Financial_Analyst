@@ -1,18 +1,19 @@
 from packages.infra.db.models import (
-    Base,
-    User,
-    AnalysisJob,
     AgentRun,
-    Report,
-    MarketDataModel,
-    FinancialDataModel,
-    NewsDataModel,
-    SentimentDataModel,
-    SectorDataModel,
-    Forecast,
+    AnalysisJob,
     AuditLog,
+    Base,
+    FinancialDataModel,
+    Forecast,
+    ForecastOutcome,
+    MarketDataModel,
+    NewsDataModel,
+    Report,
+    SectorDataModel,
+    SentimentDataModel,
+    User,
 )
-from packages.infra.db.session import engine, AsyncSessionLocal, init_db, get_db
+from packages.infra.db.session import AsyncSessionLocal, engine, get_db, init_db
 
 __all__ = [
     "Base",
@@ -26,6 +27,7 @@ __all__ = [
     "SentimentDataModel",
     "SectorDataModel",
     "Forecast",
+    "ForecastOutcome",
     "AuditLog",
     "engine",
     "AsyncSessionLocal",

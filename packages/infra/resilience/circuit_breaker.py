@@ -3,6 +3,7 @@ from enum import Enum
 import logging
 import time
 from typing import Callable, Optional, Type
+from packages.infra.observability.metrics import CIRCUIT_BREAKER_STATE
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +12,13 @@ class CircuitState(str, Enum):
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
+
+
+STATE_TO_GAUGE = {
+    CircuitState.CLOSED: 0,
+    CircuitState.OPEN: 1,
+    CircuitState.HALF_OPEN: 2,
+}
 
 
 class CircuitBreakerOpenException(Exception):
@@ -43,6 +51,13 @@ class CircuitBreaker:
         self._last_failure_time = 0.0
         self._half_open_successes = 0
         self._lock = asyncio.Lock()
+        self._update_metric()
+
+    def _update_metric(self) -> None:
+        try:
+            CIRCUIT_BREAKER_STATE.labels(source=self.service_name).set(STATE_TO_GAUGE[self._state])
+        except Exception:
+            pass
 
     @property
     def state(self) -> CircuitState:
@@ -52,6 +67,7 @@ class CircuitBreaker:
                 logger.info("Circuit breaker [%s] transitioning OPEN -> HALF_OPEN", self.service_name)
                 self._state = CircuitState.HALF_OPEN
                 self._half_open_successes = 0
+                self._update_metric()
         return self._state
 
     async def call(self, func: Callable, *args, **kwargs):
@@ -82,6 +98,7 @@ class CircuitBreaker:
                 logger.info("Circuit breaker [%s] transitioning HALF_OPEN -> CLOSED (healthy)", self.service_name)
                 self._state = CircuitState.CLOSED
                 self._failure_count = 0
+                self._update_metric()
         elif self._state == CircuitState.CLOSED:
             self._failure_count = 0
 
@@ -103,3 +120,4 @@ class CircuitBreaker:
                     self.recovery_timeout,
                 )
                 self._state = CircuitState.OPEN
+                self._update_metric()

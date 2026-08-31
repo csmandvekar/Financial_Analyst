@@ -4,12 +4,14 @@ Version: 1.0.0
 Summary: Production-grade multi-agent financial intelligence and reporting platform
 Requires-Python: >=3.12
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: fastapi>=0.111.0
 Requires-Dist: uvicorn[standard]>=0.30.0
 Requires-Dist: pydantic>=2.7.0
 Requires-Dist: pydantic-settings>=2.2.0
 Requires-Dist: sqlalchemy[asyncio]>=2.0.30
 Requires-Dist: asyncpg>=0.29.0
+Requires-Dist: aiosqlite>=0.20.0
 Requires-Dist: redis[hiredis]>=5.0.4
 Requires-Dist: langgraph>=0.0.60
 Requires-Dist: langchain>=0.2.0
@@ -21,12 +23,18 @@ Requires-Dist: numpy>=1.26.0
 Requires-Dist: pandas>=2.2.0
 Requires-Dist: alembic>=1.13.0
 Requires-Dist: python-dotenv>=1.0.1
+Requires-Dist: prometheus-client>=0.20.0
+Requires-Dist: opentelemetry-api>=1.24.0
+Requires-Dist: opentelemetry-sdk>=1.24.0
+Requires-Dist: opentelemetry-instrumentation-fastapi>=0.45b0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.2.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
 Requires-Dist: pytest-cov>=5.0.0; extra == "dev"
 Requires-Dist: ruff>=0.4.0; extra == "dev"
 Requires-Dist: mypy>=1.10.0; extra == "dev"
+Requires-Dist: locust>=2.29.0; extra == "dev"
+Dynamic: license-file
 
 # Financial Intelligence Platform — Master Plan
 

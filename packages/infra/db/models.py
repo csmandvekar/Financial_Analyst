@@ -178,6 +178,25 @@ class Forecast(Base):
     job = relationship("AnalysisJob", back_populates="forecasts")
 
 
+class ForecastOutcome(Base):
+    __tablename__ = "forecast_outcomes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    forecast_id = Column(String(36), nullable=True, index=True)
+    ticker = Column(String(10), nullable=False, index=True)
+    horizon = Column(String(10), nullable=False)  # 3m, 6m, 1y
+    prediction_date = Column(DateTime(timezone=True), nullable=False)
+    predicted_price_low = Column(Float, nullable=False)
+    predicted_price_high = Column(Float, nullable=False)
+    predicted_direction = Column(String(20), nullable=False)  # bullish, bearish, neutral
+    predicted_confidence = Column(Float, nullable=False)
+    actual_price = Column(Float, nullable=False)
+    actual_direction = Column(String(20), nullable=False)  # bullish, bearish, neutral
+    is_direction_correct = Column(Boolean, nullable=False)
+    price_error_abs = Column(Float, nullable=False)  # |midpoint - actual_price|
+    evaluated_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

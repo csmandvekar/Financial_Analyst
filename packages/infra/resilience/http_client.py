@@ -1,7 +1,12 @@
 import logging
+import time
 from typing import Any, Dict, Optional
 import httpx
 from packages.infra.config import settings
+from packages.infra.observability.metrics import (
+    EXTERNAL_API_CALL_DURATION_SECONDS,
+    EXTERNAL_API_CALL_TOTAL,
+)
 from packages.infra.resilience.circuit_breaker import CircuitBreaker
 from packages.infra.resilience.rate_limiter import TokenBucketRateLimiter
 from packages.infra.resilience.retry import execute_with_retry
@@ -10,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResilientHttpClient:
-    """HTTP Client with per-source Circuit Breaker, Rate Limiter, Timeout, and Retry."""
+    """HTTP Client with per-source Circuit Breaker, Rate Limiter, Timeout, Retry, and Metrics."""
 
     _circuit_breakers: Dict[str, CircuitBreaker] = {}
     _rate_limiters: Dict[str, TokenBucketRateLimiter] = {}
@@ -47,6 +52,8 @@ class ResilientHttpClient:
         max_attempts: int = 3,
     ) -> httpx.Response:
         timeout_val = timeout or settings.DEFAULT_TIMEOUT_SECONDS
+        t0 = time.perf_counter()
+        status_label = "success"
 
         async def _call_http():
             await self.rate_limiter.acquire()
@@ -58,7 +65,18 @@ class ResilientHttpClient:
         async def _protected_call():
             return await self.circuit_breaker.call(_call_http)
 
-        return await execute_with_retry(_protected_call, max_attempts=max_attempts)
+        try:
+            return await execute_with_retry(_protected_call, max_attempts=max_attempts)
+        except Exception as e:
+            status_label = "failed"
+            raise e
+        finally:
+            dur = time.perf_counter() - t0
+            try:
+                EXTERNAL_API_CALL_DURATION_SECONDS.labels(source=self.service_name).observe(dur)
+                EXTERNAL_API_CALL_TOTAL.labels(source=self.service_name, status=status_label).inc()
+            except Exception:
+                pass
 
     async def post(
         self,
@@ -69,6 +87,8 @@ class ResilientHttpClient:
         max_attempts: int = 3,
     ) -> httpx.Response:
         timeout_val = timeout or settings.DEFAULT_TIMEOUT_SECONDS
+        t0 = time.perf_counter()
+        status_label = "success"
 
         async def _call_http():
             await self.rate_limiter.acquire()
@@ -80,4 +100,15 @@ class ResilientHttpClient:
         async def _protected_call():
             return await self.circuit_breaker.call(_call_http)
 
-        return await execute_with_retry(_protected_call, max_attempts=max_attempts)
+        try:
+            return await execute_with_retry(_protected_call, max_attempts=max_attempts)
+        except Exception as e:
+            status_label = "failed"
+            raise e
+        finally:
+            dur = time.perf_counter() - t0
+            try:
+                EXTERNAL_API_CALL_DURATION_SECONDS.labels(source=self.service_name).observe(dur)
+                EXTERNAL_API_CALL_TOTAL.labels(source=self.service_name, status=status_label).inc()
+            except Exception:
+                pass

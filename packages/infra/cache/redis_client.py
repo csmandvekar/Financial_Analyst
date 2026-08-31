@@ -5,6 +5,7 @@ import time
 from typing import Any, Dict, Optional
 import redis.asyncio as redis
 from packages.infra.config import settings
+from packages.infra.observability.metrics import CACHE_HIT_TOTAL, CACHE_MISS_TOTAL
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ CACHE_TTLS = {
 
 
 class CacheClient:
-    """Redis cache client with key convention {source}:{ticker}:{params_hash} and fallback."""
+    """Redis cache client with key convention {source}:{ticker}:{params_hash} and metric tracking."""
 
     def __init__(self):
         self._redis: Optional[redis.Redis] = None
@@ -56,11 +57,20 @@ class CacheClient:
         return f"{source.lower()}:{ticker.upper()}:{params_hash}"
 
     async def get(self, key: str) -> Optional[Dict[str, Any]]:
+        prefix = key.split(":")[0] if ":" in key else "unknown"
         if self._connected and self._redis:
             try:
                 val = await self._redis.get(key)
                 if val:
+                    try:
+                        CACHE_HIT_TOTAL.labels(cache_key_prefix=prefix).inc()
+                    except Exception:
+                        pass
                     return json.loads(val)
+                try:
+                    CACHE_MISS_TOTAL.labels(cache_key_prefix=prefix).inc()
+                except Exception:
+                    pass
                 return None
             except Exception as e:
                 logger.warning("Redis GET error (%s). Falling back to memory cache.", e)
@@ -69,9 +79,18 @@ class CacheClient:
         if key in self._memory_cache:
             expires_at, val_str = self._memory_cache[key]
             if time.time() < expires_at:
+                try:
+                    CACHE_HIT_TOTAL.labels(cache_key_prefix=prefix).inc()
+                except Exception:
+                    pass
                 return json.loads(val_str)
             else:
                 del self._memory_cache[key]
+
+        try:
+            CACHE_MISS_TOTAL.labels(cache_key_prefix=prefix).inc()
+        except Exception:
+            pass
         return None
 
     async def set(

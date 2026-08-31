@@ -1,0 +1,45 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 3,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Forecast Confidence Score Distribution",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(forecast_confidence_score_bucket[5m])) by (le, horizon))",
+          "legendFormat": "{{horizon}} (p50 Confidence)"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(forecast_confidence_score_bucket[5m])) by (le, horizon))",
+          "legendFormat": "{{horizon}} (p90 Confidence)"
+        }
+      ]
+    },
+    {
+      "title": "Historical Backtest Directional Accuracy",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(job_completion_total{status='completed'}) / max(1, sum(job_completion_total))",
+          "legendFormat": "Pipeline Completeness"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["forecast", "evaluation", "accuracy"],
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Forecast Quality & Evaluation",
+  "uid": "forecast-eval-v1",
+  "version": 1
+}

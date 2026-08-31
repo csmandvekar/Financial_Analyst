@@ -16,6 +16,10 @@ from packages.infra.db.models import (
     SentimentDataModel,
 )
 from packages.infra.db.session import AsyncSessionLocal
+from packages.infra.observability.metrics import (
+    FORECAST_CONFIDENCE_SCORE,
+    JOB_COMPLETION_TOTAL,
+)
 from packages.orchestrator.state import OrchestratorState
 
 logger = logging.getLogger(__name__)
@@ -159,5 +163,14 @@ async def persist_node(state: OrchestratorState) -> Dict[str, Any]:
         params={"analysis_type": state.get("analysis_type", "quarterly_outlook")},
     )
     await cache_client.set(cache_key, report_schema, source="report")
+
+    # 3. Record Business & Health Metrics
+    try:
+        JOB_COMPLETION_TOTAL.labels(status=status).inc()
+        if forecast_schema and forecast_schema.horizons:
+            for h in forecast_schema.horizons:
+                FORECAST_CONFIDENCE_SCORE.labels(ticker=ticker, horizon=h.horizon).observe(h.confidence)
+    except Exception as m_err:
+        logger.debug("Observability metric increment error: %s", m_err)
 
     return {"is_completed": True}
